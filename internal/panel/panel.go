@@ -24,6 +24,7 @@ import (
 	"github.com/linguo2625469/workbuddy2api-panel/internal/auth"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/httpauth"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/livecfg"
+	"github.com/linguo2625469/workbuddy2api-panel/internal/notify"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/pool"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/reqlog"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/scheduler"
@@ -60,6 +61,9 @@ type Config struct {
 	Usage *usage.Recorder
 	// RequestLog 请求指标与归档（nil = 对应接口返回 501）。
 	RequestLog *reqlog.Recorder
+
+	// Notify 推送器（nil = 未启用推送；测试端点返回 501）。
+	Notify *notify.Sender
 
 	// ProbeFile 模型输出上限探测结果文件（scripts/probe_max_tokens.py --panel-out
 	// 写入；空或文件不存在 = model_probes 端点返回空集，面板不显示任何实测标注）。
@@ -185,6 +189,7 @@ func (p *Panel) routes() {
 	p.mux.HandleFunc("POST /panel/api/usage/save", p.withAuth(p.usageSave))
 	p.mux.HandleFunc("GET /panel/api/model_probes", p.withAuth(p.modelProbes))
 	p.mux.HandleFunc("GET /panel/api/config", p.withAuth(p.getConfig))
+	p.mux.HandleFunc("POST /panel/api/config/notify_test", p.withAuth(p.notifyTest))
 	p.mux.HandleFunc("POST /panel/api/config", p.withAuth(p.saveConfig))
 }
 
@@ -853,4 +858,19 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{"ok": false, "error": msg})
+}
+
+
+// notifyTest 推送测试端点：向已配置的 webhook 发一条测试消息，同步等待结果。
+// 未启用推送（Notify 为 nil 或 URL 为空）返回 501 与明确文案，方便面板提示。
+func (p *Panel) notifyTest(w http.ResponseWriter, r *http.Request) {
+	if p.cfg.Notify == nil {
+		writeErr(w, http.StatusNotImplemented, "notify not configured: webhook_url 为空")
+		return
+	}
+	if err := p.cfg.Notify.SendTest(); err != nil {
+		writeErr(w, http.StatusBadGateway, "推送失败: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "测试消息已发送，请在群里确认收到"})
 }

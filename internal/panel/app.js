@@ -998,6 +998,23 @@ const CFG_MAP = {
   session_sticky_enabled: ['session_sticky', 'enabled'],
   request_client_info: ['logging', 'request_client_info'],
 };
+/* 推送测试：读当前表单里的 webhook 配置直接发测试消息（不依赖已保存配置） */
+$('btnNotifyTest')?.addEventListener('click', async () => {
+  const btn = $('btnNotifyTest');
+  const f = $('cfgForm');
+  const url = f.elements['notify_webhook_url']?.value.trim();
+  const format = f.elements['notify_format']?.value || 'wecom';
+  if (!url) { toast('请先填写 Webhook 地址', 'err'); return; }
+  btn.disabled = true; btn.textContent = '发送中…';
+  try {
+    // 面板端点用的是已保存配置；这里把表单当前值先提交再测试，保证测的就是用户看到的
+    await api('config', { method: 'POST', body: JSON.stringify(collectConfig()) });
+    const r = await api('config/notify_test', { method: 'POST' });
+    toast(r.message || '测试消息已发送', 'ok');
+  } catch (e) { toast('推送失败：' + e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = '发送测试消息'; }
+});
+
 /* 「覆盖型」文本字段：空串本身是有意义的取值（= 回落到内置默认），必须照发。
  *
  * 其余文本字段保持「空 = 不下发」的既有语义——那是防误清空的保护，不是 bug：

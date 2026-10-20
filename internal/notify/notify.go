@@ -9,6 +9,7 @@ package notify
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -167,6 +168,39 @@ func (s *Sender) SendSync(event, key, title string, lines ...string) {
 		return
 	}
 	resp.Body.Close()
+}
+
+// SendTest 发送一条测试消息（同步、绕过静默窗口），返回投递结果供面板直接提示。
+func (s *Sender) SendTest() error {
+	if s == nil {
+		return fmt.Errorf("notify not configured")
+	}
+	s.mu.Lock()
+	cfg := s.cfg
+	client := s.client
+	s.mu.Unlock()
+	if client == nil || strings.TrimSpace(cfg.WebhookURL) == "" {
+		return fmt.Errorf("webhook_url 为空")
+	}
+	body := buildBody(cfg.Format, "🧪 WorkBuddy2API 推送测试",
+		[]string{"通知功能已启用", "来自面板手动测试"})
+	resp, err := client.Post(cfg.WebhookURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	// 企微/钉钉/飞书对错误 key 也返回 200，body 里带 errcode——尽力解析提示
+	var m struct {
+		Errcode int    `json:"errcode"`
+		Errmsg  string `json:"errmsg"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&m); err == nil && m.Errcode != 0 {
+		return fmt.Errorf("errcode %d: %s", m.Errcode, m.Errmsg)
+	}
+	return nil
 }
 
 // buildBody 按渠道格式构造 JSON 请求体。
