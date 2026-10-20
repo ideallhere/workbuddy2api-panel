@@ -108,6 +108,7 @@ func (s *Sender) Enabled(event string) bool {
 //   - lines: 明细行
 func (s *Sender) Send(event, key, title string, lines ...string) {
 	if !s.Enabled(event) {
+		log.Printf("[notify] %s skipped: disabled (sender nil or url empty or event not enabled)", event)
 		return
 	}
 	s.mu.Lock()
@@ -119,6 +120,7 @@ func (s *Sender) Send(event, key, title string, lines ...string) {
 		}
 		if last, ok := s.silence[key]; ok && time.Since(last) < win {
 			s.mu.Unlock()
+			log.Printf("[notify] %s skipped: silence window (key=%s, last=%s)", event, key, last.Format("15:04:05"))
 			return
 		}
 		s.silence[key] = time.Now()
@@ -149,6 +151,8 @@ func (s *Sender) Send(event, key, title string, lines ...string) {
 		defer resp.Body.Close()
 		if resp.StatusCode >= 300 {
 			log.Printf("[notify] send %s got HTTP %d", event, resp.StatusCode)
+		} else {
+			log.Printf("[notify] send %s ok (HTTP %d)", event, resp.StatusCode)
 		}
 	}()
 }
