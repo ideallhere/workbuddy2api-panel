@@ -25,6 +25,7 @@ const (
 	EventCreditExpiring  = "credit_expiring"  // 积分即将过期
 	EventCheckinResult   = "checkin_result"   // 签到结果（成功/失败）
 	EventServiceAbnormal = "service_abnormal" // 服务异常（上游不可用等）
+	EventTaskResult      = "task_result"      // 排程任务结果（签到/旅行/活跃/保活/夜猫子）
 )
 
 // Config 推送配置（config.json 的 notify 节，支持热更新）。

@@ -3,6 +3,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -52,9 +53,11 @@ func (s *Scheduler) RunBlackcatNow() {
 		ok, err := s.cfg.Upstream.RunNightChats(a, int(need))
 		if err != nil {
 			log.Printf("blackcat %s: %d/%d 完成，中断: %v", logfmt.Label(a.UID, a.Nickname), ok, need, err)
+			s.taskNotify("blackcat", a.UID, a.Nickname, false, fmt.Sprintf("完成 %d/%d 次后中断: %v", ok, need, err))
 			continue
 		}
 		log.Printf("blackcat %s: 完成 %d 次夜间对话", logfmt.Label(a.UID, a.Nickname), ok)
+		s.taskNotify("blackcat", a.UID, a.Nickname, true, fmt.Sprintf("完成 %d/%d 次夜间对话", ok, need))
 		time.Sleep(activityAccountDelay)
 	}
 }

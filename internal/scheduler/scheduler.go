@@ -481,6 +481,7 @@ func (s *Scheduler) RunCheckinNow() {
 					log.Printf("checkin %s: 今天已签到（幂等）", logfmt.Label(st.UID, st.Nickname))
 				} else {
 					log.Printf("checkin %s: %v", logfmt.Label(st.UID, st.Nickname), err)
+					s.taskNotify("checkin", st.UID, st.Nickname, false, "错误: "+err.Error())
 				}
 				// 其余业务错误也继续走余额查询
 			} else {
@@ -488,10 +489,7 @@ func (s *Scheduler) RunCheckinNow() {
 				// 重复触发时出现），成功也落一行。
 				s.cfg.Pool.NoteCheckinDone(st.UID)
 				log.Printf("checkin %s: 签到成功", logfmt.Label(st.UID, st.Nickname))
-				if s.cfg.Notify != nil {
-					s.cfg.Notify.Send(notify.EventCheckinResult, notify.EventCheckinResult+":"+st.UID+":"+time.Now().Format("2006-01-02"),
-						"✅ WorkBuddy 签到成功", "账号: "+logfmt.Label(st.UID, st.Nickname))
-				}
+				s.taskNotify("checkin", st.UID, st.Nickname, true)
 			}
 		}
 		// 分桶查余额：配置窗口内的积分单独标记，同时记录最早未来到期批次。
@@ -505,6 +503,31 @@ func (s *Scheduler) RunCheckinNow() {
 		s.notifyCredits(st, remain, total, expiring, earliestAt)
 	}
 	s.RunStreakBonusNow()
+}
+
+// taskNotify 排程任务结果推送（签到/旅行/活跃/保活/夜猫子）。
+// task: checkin|travel|activity|keepalive|blackcat；ok: 是否成功；detail: 补充行。
+// 去重键含自然日，同任务同账号同日只推首条（幂等签到不会刷屏）。
+func (s *Scheduler) taskNotify(task, uid, nickname string, ok bool, detail ...string) {
+	n := s.cfg.Notify
+	if n == nil {
+		return
+	}
+	icon := "✅"
+	if !ok {
+		icon = "❌"
+	}
+	name := map[string]string{
+		"checkin": "签到", "travel": "猫猫旅行", "activity": "活跃上报",
+		"keepalive": "Token 保活", "blackcat": "夜猫子",
+	}[task]
+	if name == "" {
+		name = task
+	}
+	n.Send(notify.EventTaskResult,
+		notify.EventTaskResult+":"+task+":"+uid+":"+time.Now().Format("2006-01-02"),
+		icon+" WorkBuddy "+name+(map[bool]string{true: "成功", false: "失败"})[ok],
+		append([]string{"账号: " + logfmt.Label(uid, nickname)}, detail...)...)
 }
 
 // notifyCredits 余额/积分过期推送。失败由 notify 包内部兜底，不影响主流程。
@@ -579,6 +602,7 @@ func (s *Scheduler) runActivity(ctx context.Context) {
 		cid := fmt.Sprintf("wb2api-%d", time.Now().UnixMilli())
 		if err := s.cfg.Upstream.ReportChatActivity(a, cid, ""); err != nil {
 			log.Printf("activity %s: %v", logfmt.Label(a.UID, a.Nickname), err)
+			s.taskNotify("activity", a.UID, a.Nickname, false, "错误: "+err.Error())
 			continue
 		}
 		s.checkActivityStreak(a) // 上报成功 → 回读 streak 自检
@@ -603,6 +627,7 @@ func (s *Scheduler) checkActivityStreak(a *auth.Auth) bool {
 		return true
 	}
 	log.Printf("activity %s: streak days=%d", logfmt.Label(a.UID, a.Nickname), days)
+	s.taskNotify("activity", a.UID, a.Nickname, true, fmt.Sprintf("连登天数: %d", days))
 	return false
 }
 
@@ -625,6 +650,7 @@ func (s *Scheduler) RunKeepaliveNow() {
 		}
 		if err := s.cfg.Upstream.RefreshToken(a); err != nil {
 			log.Printf("keepalive %s: %v", logfmt.Label(st.UID, st.Nickname), err)
+		s.taskNotify("keepalive", st.UID, st.Nickname, false, "错误: "+err.Error())
 			var ue *upstream.Error
 			if errors.As(err, &ue) && ue.Kind == upstream.ErrSessionDead && !st.Disabled {
 				if s.cfg.Pool.NoteSessionDead(st.UID) {

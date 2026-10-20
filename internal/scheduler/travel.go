@@ -106,9 +106,11 @@ func (s *Scheduler) travelDepart(a *auth.Auth, ts *upstream.TravelState) {
 	}
 	if err := s.cfg.Upstream.TravelDepart(a, travelLocationID); err != nil {
 		log.Printf("travel %s: depart: %v", logfmt.Label(a.UID, a.Nickname), err)
+		s.taskNotify("travel", a.UID, a.Nickname, false, "错误: "+err.Error())
 		return
 	}
 	log.Printf("travel %s: depart ok location=%d", logfmt.Label(a.UID, a.Nickname), travelLocationID)
+	s.taskNotify("travel", a.UID, a.Nickname, true, "派出成功，地点编号 "+fmt.Sprintf("%d", travelLocationID))
 }
 
 // travelClaim 到站领奖（必须带 record_id）。
@@ -123,6 +125,7 @@ func (s *Scheduler) travelClaim(a *auth.Auth, ts *upstream.TravelState) {
 		return
 	}
 	log.Printf("travel %s: claim ok record=%d reward=%d", logfmt.Label(a.UID, a.Nickname), ts.RecordID, reward)
+	s.taskNotify("travel", a.UID, a.Nickname, true, fmt.Sprintf("领奖成功，奖励 +%d 积分", reward))
 }
 
 // travelAdopt 无猫时领养，链路：report → agreement → buddy/first。
