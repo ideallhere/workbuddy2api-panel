@@ -366,6 +366,9 @@ func (s *Scheduler) waitSlot(ctx context.Context, next time.Time, step time.Dura
 func (s *Scheduler) Run(ctx context.Context) {
 	for {
 		next, kinds := s.nextWake(time.Now())
+		if !next.IsZero() {
+			log.Printf("[scheduler] next wake at %s kinds=%v", next.Format("01-02 15:04:05"), kinds)
+		}
 		if next.IsZero() {
 			// 四类任务全部禁用：不空转，等重排通知（在线改配置重新启用）或退出信号。
 			select {
