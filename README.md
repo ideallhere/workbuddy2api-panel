@@ -940,3 +940,41 @@ sudo chown -R 10001:10001 ./auths ./data ./config.json
 - 允许任意使用、复制、修改、合并、发布、分发、再授权及销售
 - 再分发（源码或二进制形式）时，请保留原仓库的 MIT 版权声明与许可声明（如在 NOTICE 或 README 中注明原始出处 `https://github.com/Sliverkiss/workbuddy2api`）
 - 本项目不授予任何上游（CodeBuddy / 腾讯）接口或服务的权利；使用者仍需自行遵守上游服务条款
+
+---
+
+## 事件推送（notify 节，fork 增强）
+
+本 fork 新增 `notify` 配置节：账号事件经通用 Webhook 推送到企业微信/钉钉/飞书/Bark。
+
+```json
+"notify": {
+  "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx",
+  "format": "wecom",
+  "enabled_events": [],
+  "credit_threshold": 500,
+  "silence_window": "30m",
+  "timeout": "10s"
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| webhook_url | 机器人地址；空 = 禁用推送 |
+| format | wecom（默认）/ dingtalk / feishu / bark / raw |
+| enabled_events | 启用的事件列表；空 = 全部启用 |
+| credit_threshold | credit_low 阈值（账号剩余积分低于它就推）；<=0 = 不推 |
+| silence_window | 同事件静默期（防轰炸），缺省 30m |
+| timeout | 请求超时，缺省 10s |
+
+### 事件类型
+| 事件 | 触发 |
+|---|---|
+| account_cooled | 账号进入硬冷却（余额耗尽等 CoolHard）|
+| account_banned | 账号被封禁/禁用 |
+| credit_low | 余额低于 credit_threshold |
+| credit_expiring | 有积分即将过期 |
+| checkin_result | 签到成功 |
+| service_abnormal | 服务异常 |
+
+推送失败仅记日志不影响主流程；同 key 事件在 silence_window 内只发首条。

@@ -19,6 +19,7 @@ import (
 
 	"github.com/linguo2625469/workbuddy2api-panel/internal/auth"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/livecfg"
+	"github.com/linguo2625469/workbuddy2api-panel/internal/notify"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/panel"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/pool"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/redisstore"
@@ -170,9 +171,31 @@ func main() {
 	// 回落仓库内嵌种子；models.dev 按需拉取成功后原子写回。
 	upstream.SetModelCatalogPath(stateSibling(cfg.StateFile, "model.json"))
 
+	// 事件推送器（config.notify 节；webhook_url 为空 = 未启用，Sender 为 nil）。
+	notifySender := notify.New(notify.Config{
+		WebhookURL:      cfg.Notify.WebhookURL,
+		Format:          cfg.Notify.Format,
+		EnabledEvents:   cfg.Notify.EnabledEvents,
+		CreditThreshold: cfg.Notify.CreditThreshold,
+		SilenceWindow:   cfg.Notify.SilenceWindow,
+		Timeout:         cfg.Notify.Timeout,
+	})
+	if notifySender != nil {
+		log.Printf("事件推送已启用：format=%s events=%v threshold=%.0f",
+			cfg.Notify.Format, cfg.Notify.EnabledEvents, cfg.Notify.CreditThreshold)
+		// pool 侧事件（账号冷却/封禁）直接挂钩
+		p.SetNotifyHook(func(event, uid, reason string) {
+			notifySender.Send(event, event+":"+uid, "⚠️ WorkBuddy 账号事件",
+				"账号: "+uid, "事件: "+event, "原因: "+reason)
+		})
+	} else {
+		log.Printf("事件推送未启用（notify.webhook_url 为空）")
+	}
+
 	sch := scheduler.New(scheduler.Config{
 		Pool:           p,
 		Upstream:       up,
+		Notify:         notifySender,
 		CheckinHours:   cfg.Schedule.CheckinHours,
 		TravelHours:    cfg.Schedule.TravelHours,
 		ActivityHours:  cfg.Schedule.ActivityHours,

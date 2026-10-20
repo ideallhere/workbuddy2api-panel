@@ -7,6 +7,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/linguo2625469/workbuddy2api-panel/internal/notify"
 )
 
 func (p *Pool) SetCredits(uid string, credits, total int64) {
@@ -127,6 +129,9 @@ func (p *Pool) Cooldown(uid string, kind CoolKind, d time.Duration, reason strin
 		e.until = time.Now().Add(d)
 		e.coolKind = kind
 		e.reason = reason
+		if kind == CoolHard && p.notifyHook != nil {
+			p.notifyHook(notify.EventAccountCooled, uid, reason)
+		}
 		// 非模型级冷却入口：清空会参与路由的模型级冷却，避免上一次
 		// 模型豁免泄漏到账号级冷却上；AuditOnly 条目不影响路由，保留展示。
 		clearRoutingModelCooldownsLocked(e)

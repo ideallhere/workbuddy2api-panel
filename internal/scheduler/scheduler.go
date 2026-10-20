@@ -13,6 +13,7 @@ import (
 
 	"github.com/linguo2625469/workbuddy2api-panel/internal/auth"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/logfmt"
+	"github.com/linguo2625469/workbuddy2api-panel/internal/notify"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/pool"
 	"github.com/linguo2625469/workbuddy2api-panel/internal/upstream"
 )
@@ -56,6 +57,10 @@ type Config struct {
 	// 缺省 false = 保持「禁用的跳过」既有语义；打开后禁用号照常签到保号，但**仍不参与
 	// 选号**——pool.pick 侧的 disabled 过滤与本开关无关。
 	IncludeDisabledInTasks bool
+
+	// Notify 推送器（nil = 未配置推送）。签到结果/余额阈值/积分过期事件经它发出；
+	// 账号冷却/封禁事件由 pool 侧直接触发（不经调度器）。
+	Notify *notify.Sender
 
 	// GrowthHook 成长任务队列执行回调（panel.RunGrowthQueueOnce：扫描全部账号
 	// 待办并执行，与面板「执行全部待办」按钮同管线）。调度器只管时点不管实现——
@@ -483,6 +488,10 @@ func (s *Scheduler) RunCheckinNow() {
 				// 重复触发时出现），成功也落一行。
 				s.cfg.Pool.NoteCheckinDone(st.UID)
 				log.Printf("checkin %s: 签到成功", logfmt.Label(st.UID, st.Nickname))
+				if s.cfg.Notify != nil {
+					s.cfg.Notify.Send(notify.EventCheckinResult, notify.EventCheckinResult+":"+st.UID+":"+time.Now().Format("2006-01-02"),
+						"✅ WorkBuddy 签到成功", "账号: "+logfmt.Label(st.UID, st.Nickname))
+				}
 			}
 		}
 		// 分桶查余额：配置窗口内的积分单独标记，同时记录最早未来到期批次。
@@ -493,8 +502,35 @@ func (s *Scheduler) RunCheckinNow() {
 		}
 		s.cfg.Pool.ReenableIfCredits(st.UID, remain, total)
 		s.cfg.Pool.SetCreditsDetailed(st.UID, remain, total, expiring, earliestAt, earliestRemaining)
+		s.notifyCredits(st, remain, total, expiring, earliestAt)
 	}
 	s.RunStreakBonusNow()
+}
+
+// notifyCredits 余额/积分过期推送。失败由 notify 包内部兜底，不影响主流程。
+func (s *Scheduler) notifyCredits(st pool.Status, remain, total, expiring int64, earliestAt time.Time) {
+	n := s.cfg.Notify
+	if n == nil {
+		return
+	}
+	uid := st.UID
+	label := logfmt.Label(uid, st.Nickname)
+	// credit_low：低于阈值（每账号每静默窗口最多一条）
+	if th := n.CreditThreshold(); th > 0 && float64(remain) < th {
+		n.Send(notify.EventCreditLow, notify.EventCreditLow+":"+uid,
+			"⚠️ WorkBuddy 余额不足",
+			"账号: "+label,
+			fmt.Sprintf("剩余积分: %d / %d", remain, total),
+			fmt.Sprintf("阈值: %.0f", th))
+	}
+	// credit_expiring：有快过期积分
+	if expiring > 0 && !earliestAt.IsZero() {
+		n.Send(notify.EventCreditExpiring, notify.EventCreditExpiring+":"+uid+":"+earliestAt.Format("2006-01-02"),
+			"⏳ WorkBuddy 积分即将过期",
+			"账号: "+label,
+			fmt.Sprintf("即将过期积分: %d", expiring),
+			"到期时间: "+earliestAt.Format("2006-01-02 15:04"))
+	}
 }
 
 // RunActivityNow 立即对池内所有可用账号执行一次对话活跃上报。

@@ -12,6 +12,10 @@ import (
 )
 
 type Pool struct {
+
+	// notifyHook 账号事件推送回调（nil = 未配置推送）。main 装配后经
+	// SetNotifyHook 注入；Cooldown/Disable 等入口触发。失败由 notify 包内部兜底。
+	notifyHook func(event, uid, reason string)
 	mu      sync.RWMutex
 	byUID   map[string]*entry
 	stateFp string
@@ -119,6 +123,12 @@ func (p *Pool) Close() {
 		close(p.stopCh)
 	})
 	p.Flush()
+}
+
+// SetNotifyHook 注入账号事件推送回调（main 装配；nil = 未配置推送）。
+// 事件仅两类来源：账号进入冷却（account_cooled）与账号被禁用（account_banned）。
+func (p *Pool) SetNotifyHook(hook func(event, uid, reason string)) {
+	p.notifyHook = hook
 }
 
 // SetBreaker 注入熔断器参数（main 从 config 解析后调用）。非正值保留原值（用默认）。

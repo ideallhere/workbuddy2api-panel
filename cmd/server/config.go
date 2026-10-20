@@ -108,6 +108,15 @@ type Config struct {
 		BalanceRefreshMinutes int  `json:"balance_refresh_minutes"` // 缺省 5；<=0 回落 5
 	} `json:"schedule"`
 
+	Notify struct {
+		WebhookURL      string   `json:"webhook_url"`      // 空 = 禁用推送
+		Format          string   `json:"format"`           // wecom | dingtalk | feishu | bark | raw，缺省 wecom
+		EnabledEvents   []string `json:"enabled_events"`   // 启用的事件；空 = 全部
+		CreditThreshold float64  `json:"credit_threshold"` // credit_low 阈值；<=0 = 不推
+		SilenceWindow   string   `json:"silence_window"`   // 同事件静默期，缺省 "30m"
+		Timeout         string   `json:"timeout"`          // 请求超时，缺省 "10s"
+	} `json:"notify"`
+
 	Global struct {
 		// Enabled global realm 路由开关。缺省 true：Realm() 正常把 realm=global/
 		// domain=workbuddy.ai 的账号判为 global 并路由 global base/路径。
