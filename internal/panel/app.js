@@ -966,6 +966,12 @@ $('btnLogPin').onclick = () => {
 
 /* ── 配置 ─────────────────────────────────────────────────────────── */
 const CFG_MAP = {
+  notify_webhook_url: ['notify', 'webhook_url'],
+  notify_format: ['notify', 'format'],
+  notify_enabled_events: ['notify', 'enabled_events'],
+  notify_credit_threshold: ['notify', 'credit_threshold'],
+  notify_silence_window: ['notify', 'silence_window'],
+  notify_timeout: ['notify', 'timeout'],
   listen: ['listen'], api_key: ['api_key'],
   package_detail_limit: ['panel', 'package_detail_limit'],
   checkin_hours: ['schedule', 'checkin_hours'], checkin_enabled: ['schedule', 'checkin_enabled'], growth_hours: ['schedule', 'growth_hours'], growth_enabled: ['schedule', 'growth_enabled'],
@@ -1003,7 +1009,7 @@ const CFG_MAP = {
  * 刻意不含 api_key：清空它 = 关闭整个鉴权，误触代价是网关变成无鉴权公开服务。
  * 该字段（以及提示文案"留空 = 不鉴权"与现状不符的问题）单独处理。
  */
-const CLEARABLE_CFG = new Set(['user_agent', 'prompt_file']);
+const CLEARABLE_CFG = new Set(['user_agent', 'prompt_file', 'notify_webhook_url']);
 
 function dig(obj, path) { return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
 function put(obj, path, val) {
@@ -1055,7 +1061,8 @@ function collectConfig() {
    不再等到保存被拒。 */
 const DURATION_RE = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
 const DURATION_FIELDS = ['soft_rate', 'soft_rate_max', 'breaker_cooldown', 'breaker_cooldown_max',
-  'degrade_cooldown', 'degrade_cooldown_max', 'cost_explore_interval', 'expiring_soon', 'ttl'];
+  'degrade_cooldown', 'degrade_cooldown_max', 'cost_explore_interval', 'expiring_soon', 'ttl',
+  'notify_silence_window', 'notify_timeout'];
 const DURATION_TIP = '格式应为 Go 时长：30m / 2h / 600s / 1h30m';
 function durationBad(name) {
   const el = $('cfgForm').elements[name];

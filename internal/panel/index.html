@@ -896,6 +896,37 @@ legend { font-size: 12px; color: var(--ink-3); font-weight: 600; padding-bottom:
     <section class="view" id="view-config" hidden>
       <form id="cfgForm">
         <div class="box">
+          <header><h3>事件推送</h3><span class="grow"></span><span class="note">企微/钉钉/飞书/Bark</span></header>
+          <div class="pad">
+            <label class="fld"><span class="lb">Webhook 地址（留空 = 禁用推送）</span>
+              <input name="notify_webhook_url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">
+              <span class="hint">保存后立即生效，无需重启</span></label>
+            <div class="grid2">
+              <label class="fld"><span class="lb">消息格式</span>
+                <select name="notify_format">
+                  <option value="wecom">企业微信</option>
+                  <option value="dingtalk">钉钉</option>
+                  <option value="feishu">飞书</option>
+                  <option value="bark">Bark</option>
+                  <option value="raw">原始 JSON</option>
+                </select></label>
+              <label class="fld"><span class="lb">余额阈值（低于即推送，0 = 不推）</span>
+                <input name="notify_credit_threshold" type="number" min="0" placeholder="500"></label>
+            </div>
+            <div class="grid2">
+              <label class="fld"><span class="lb">启用事件（逗号分隔，留空 = 全部）</span>
+                <input name="notify_enabled_events" placeholder="account_cooled, credit_low, task_result">
+                <span class="hint">可选：account_cooled / account_banned / credit_low / credit_expiring / checkin_result / task_result / service_abnormal</span></label>
+              <label class="fld"><span class="lb">同事件静默期</span>
+                <input name="notify_silence_window" placeholder="30m">
+                <span class="hint">Go 时长格式，防轰炸</span></label>
+              <label class="fld"><span class="lb">推送超时</span>
+                <input name="notify_timeout" placeholder="10s">
+                <span class="hint">Go 时长格式</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="box">
           <header><h3>服务</h3><span class="grow"></span><span class="note" id="cfgPath"></span></header>
           <div class="pad">
             <div class="grid2">

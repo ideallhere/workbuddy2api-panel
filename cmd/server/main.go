@@ -305,7 +305,7 @@ func main() {
 			return Load(*cfgPath)
 		},
 		SaveConfig: func(raw []byte) ([]string, error) {
-			return saveConfig(raw, *cfgPath, live, p, up, sch)
+			return saveConfig(raw, *cfgPath, live, p, up, sch, notifySender)
 		},
 	})
 	// 成长任务队列每日自动执行（与「执行全部待办」同管线）：Sequential 族零点解锁后
@@ -442,7 +442,7 @@ func panelListenPath(listen string) string {
 // 落盘用"先写 tmp 再 rename"原子替换，且优先保留磁盘上的原始 JSON 结构（只改
 // 面板表单覆盖到的键），避免把用户手写的注释性字段/未知键洗掉——这里直接整体
 // 序列化校验后的配置，未知键在 json.Unmarshal 时已丢失，故先合并原始 map。
-func saveConfig(raw []byte, path string, live *livecfg.Holder, p *pool.Pool, up *upstream.Client, sch *scheduler.Scheduler) ([]string, error) {
+func saveConfig(raw []byte, path string, live *livecfg.Holder, p *pool.Pool, up *upstream.Client, sch *scheduler.Scheduler, ns *notify.Sender) ([]string, error) {
 	// 1) 解析原始 JSON 为 map（保留用户手写的未知键），再叠加面板提交的键。
 	oldRaw, err := os.ReadFile(path)
 	if err != nil {
@@ -528,6 +528,19 @@ func saveConfig(raw []byte, path string, live *livecfg.Holder, p *pool.Pool, up 
 		!newCfg.Schedule.GrowthEnabled)
 	sch.SetBalanceInterval(newCfg.BalanceRefreshInterval)
 	sch.SetIncludeDisabledInTasks(newCfg.Schedule.IncludeDisabledInTasks)
+
+	// 推送器热更新：webhook_url/格式/事件/阈值改动立即生效（无需重启）。
+	// nil 接收也安全：Reconfigure 内部判空 URL 后自禁用。
+	if ns != nil {
+		ns.Reconfigure(notify.Config{
+			WebhookURL:      newCfg.Notify.WebhookURL,
+			Format:          newCfg.Notify.Format,
+			EnabledEvents:   newCfg.Notify.EnabledEvents,
+			CreditThreshold: newCfg.Notify.CreditThreshold,
+			SilenceWindow:   newCfg.Notify.SilenceWindow,
+			Timeout:         newCfg.Notify.Timeout,
+		})
+	}
 
 	return restartRequiredFields(newCfg), nil
 }
