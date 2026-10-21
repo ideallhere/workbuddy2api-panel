@@ -53,6 +53,10 @@ func New(cfg Config) *Sender {
 	if strings.TrimSpace(cfg.WebhookURL) == "" {
 		return nil
 	}
+	// 缺省 text（纯文本）：不套 markdown 卡片样式
+	if strings.TrimSpace(cfg.Format) == "" {
+		cfg.Format = "text"
+	}
 	s := &Sender{
 		cfg:      cfg,
 		silence:  make(map[string]time.Time),
@@ -227,7 +231,13 @@ func buildBody(format, title string, lines []string) []byte {
 		return []byte(fmt.Sprintf(`{"title":%q,"body":%q}`, title, strings.Join(lines, "\n")))
 	case "raw":
 		return []byte(fmt.Sprintf(`{"title":%q,"lines":%q}`, title, strings.Join(lines, "\n")))
-	default: // wecom 企业微信机器人 markdown
+	case "text": // 纯文本（企微 msgtype=text，无卡片样式）
+		return []byte(fmt.Sprintf(`{"msgtype":"text","text":{"content":%q}}`,
+			title+"\n"+strings.Join(lines, "\n")))
+	case "wecom_text": // 别名，等同 text
+		return []byte(fmt.Sprintf(`{"msgtype":"text","text":{"content":%q}}`,
+			title+"\n"+strings.Join(lines, "\n")))
+	default: // wecom 企业微信机器人 markdown（卡片样式）
 		md := fmt.Sprintf("## %s\n%s", title, strings.Join(lines, "\n"))
 		return []byte(fmt.Sprintf(`{"msgtype":"markdown","markdown":{"content":%q}}`, md))
 	}

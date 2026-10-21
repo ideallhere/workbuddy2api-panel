@@ -110,7 +110,7 @@ type Config struct {
 
 	Notify struct {
 		WebhookURL      string   `json:"webhook_url"`      // 空 = 禁用推送
-		Format          string   `json:"format"`           // wecom | dingtalk | feishu | bark | raw，缺省 wecom
+		Format          string   `json:"format"`           // text | wecom | dingtalk | feishu | bark | raw，缺省 text（纯文本，无卡片）
 		EnabledEvents   []string `json:"enabled_events"`   // 启用的事件；空 = 全部
 		CreditThreshold float64  `json:"credit_threshold"` // credit_low 阈值；<=0 = 不推
 		SilenceWindow   string   `json:"silence_window"`   // 同事件静默期，缺省 "30m"
